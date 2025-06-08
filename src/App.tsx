@@ -17,6 +17,8 @@ interface Task {
   timeEstimate: string;
   fromCalendar?: boolean;
   calendarEventId?: number;
+  pomodoros: number;
+  completedPomodoros: number;
 }
 
 interface CalendarEvent {
@@ -33,6 +35,12 @@ function Dashboard() {
   const [completedToday, setCompletedToday] = useState(0);
   const [focusTimer, setFocusTimer] = useState(25 * 60); // 25 minutes
   const [isTimerRunning, setIsTimerRunning] = useState(false);
+  const [currentTaskId, setCurrentTaskId] = useState<number | null>(null);
+  const [workSession, setWorkSession] = useState<{
+    tasks: Task[];
+    currentIndex: number;
+    isActive: boolean;
+  }>({ tasks: [], currentIndex: 0, isActive: false });
 
   // Timer logic
   useEffect(() => {
@@ -43,7 +51,50 @@ function Dashboard() {
       }, 1000);
     } else if (focusTimer === 0) {
       setIsTimerRunning(false);
-      alert('Focus session complete! Time for a break 🎉');
+      
+      // Complete a pomodoro for current task
+      if (currentTaskId) {
+        setTasks(prevTasks => prevTasks.map(task => {
+          if (task.id === currentTaskId) {
+            const newCompletedPomodoros = task.completedPomodoros + 1;
+            const isTaskComplete = newCompletedPomodoros >= task.pomodoros;
+            
+            if (isTaskComplete && !task.completed) {
+              setCompletedToday(prev => prev + 1);
+            }
+            
+            return {
+              ...task,
+              completedPomodoros: newCompletedPomodoros,
+              completed: isTaskComplete
+            };
+          }
+          return task;
+        }));
+      }
+      
+      // Handle work session progression
+      if (workSession.isActive) {
+        const currentTask = workSession.tasks[workSession.currentIndex];
+        if (currentTask && currentTask.completedPomodoros + 1 >= currentTask.pomodoros) {
+          // Move to next task in session
+          const nextIndex = workSession.currentIndex + 1;
+          if (nextIndex < workSession.tasks.length) {
+            setWorkSession(prev => ({ ...prev, currentIndex: nextIndex }));
+            setCurrentTaskId(workSession.tasks[nextIndex].id);
+            alert(`Pomodoro complete! 🎉 Moving to next task: ${workSession.tasks[nextIndex].text}`);
+          } else {
+            setWorkSession({ tasks: [], currentIndex: 0, isActive: false });
+            setCurrentTaskId(null);
+            alert('Work session complete! 🎉 Great job!');
+          }
+        } else {
+          alert(`Pomodoro complete! 🎉 Take a ${workSession.currentIndex % 4 === 3 ? '15-30 minute' : '5 minute'} break, then continue with: ${currentTask?.text}`);
+        }
+      } else {
+        alert('Focus session complete! Time for a break 🎉');
+      }
+      
       setFocusTimer(25 * 60);
     }
     return () => {
@@ -51,7 +102,7 @@ function Dashboard() {
         clearInterval(interval);
       }
     };
-  }, [isTimerRunning, focusTimer]);
+  }, [isTimerRunning, focusTimer, currentTaskId, workSession]);
 
   // Auto-sync today's work events to tasks when component loads
   useEffect(() => {
@@ -75,7 +126,9 @@ function Dashboard() {
         priority: 'medium',
         timeEstimate: '30min',
         fromCalendar: true,
-        calendarEventId: event.id
+        calendarEventId: event.id,
+        pomodoros: 1,
+        completedPomodoros: 0
       }));
       
       setTasks(prev => [...prev, ...newTasks]);
@@ -120,9 +173,43 @@ function Dashboard() {
       
       <div className="bg-white rounded-xl shadow-lg p-6">
         <Routes>
-          <Route path="/" element={<DailyTasks tasks={tasks} setTasks={setTasks} completedToday={completedToday} setCompletedToday={setCompletedToday} />} />
-          <Route path="/calendar" element={<Calendar calendarEvents={calendarEvents} setCalendarEvents={setCalendarEvents} tasks={tasks} setTasks={setTasks} />} />
-          <Route path="/focus" element={<FocusTimer focusTimer={focusTimer} setFocusTimer={setFocusTimer} isTimerRunning={isTimerRunning} setIsTimerRunning={setIsTimerRunning} />} />
+          <Route path="/" element={
+            <DailyTasks 
+              tasks={tasks} 
+              setTasks={setTasks} 
+              completedToday={completedToday} 
+              setCompletedToday={setCompletedToday}
+              currentTaskId={currentTaskId}
+              setCurrentTaskId={setCurrentTaskId}
+              workSession={workSession}
+              setWorkSession={setWorkSession}
+              focusTimer={focusTimer}
+              setFocusTimer={setFocusTimer}
+              isTimerRunning={isTimerRunning}
+              setIsTimerRunning={setIsTimerRunning}
+            />
+          } />
+          <Route path="/calendar" element={
+            <Calendar 
+              calendarEvents={calendarEvents} 
+              setCalendarEvents={setCalendarEvents} 
+              tasks={tasks} 
+              setTasks={setTasks} 
+            />
+          } />
+          <Route path="/focus" element={
+            <FocusTimer 
+              focusTimer={focusTimer} 
+              setFocusTimer={setFocusTimer} 
+              isTimerRunning={isTimerRunning} 
+              setIsTimerRunning={setIsTimerRunning}
+              tasks={tasks}
+              currentTaskId={currentTaskId}
+              setCurrentTaskId={setCurrentTaskId}
+              workSession={workSession}
+              setWorkSession={setWorkSession}
+            />
+          } />
           <Route path="/tips" element={<ParentHacks />} />
         </Routes>
       </div>
