@@ -17,6 +17,8 @@ interface Task {
   timeEstimate: string;
   fromCalendar?: boolean;
   calendarEventId?: number;
+  pomodoros: number;
+  completedPomodoros: number;
 }
 
 interface CalendarProps {
@@ -71,7 +73,9 @@ const Calendar = ({ calendarEvents, setCalendarEvents, setTasks }: CalendarProps
           priority: 'medium',
           timeEstimate: '30min',
           fromCalendar: true,
-          calendarEventId: eventId
+          calendarEventId: eventId,
+          pomodoros: 1,
+          completedPomodoros: 0
         }]);
       }
       
